@@ -1,13 +1,13 @@
 # Image Recognition Project in C++
 
 ## Project Overview
-- This C++ project leverages OpenCV, GLFW, and IMGUI to implement various image recognition features. The project includes the following functionalities:
+- This C++ project leverages OpenCV, GLFW, and IMGUI to implement various image recognition features. The project includes the following functionalities:   
 
-1. Face Detection
-2. Eyes Detection
-3. Image Capture
-4. Face Recognition
-5. Facial Emotion Detection (Additional)
+    1. Face Detection
+    2. Eyes Detection
+    3. Image Capture
+    4. Face Recognition
+    5. Facial Emotion Detection (Additional)
 
 ## Prerequisites
 Before running the project, ensure you have the following dependencies installed:
@@ -17,7 +17,7 @@ Before running the project, ensure you have the following dependencies installed
     - MINGW: https://sourceforge.net/projects/mingw/
 
 2. **Install or Extract OpenCV to the C:\ directory.**
-    -Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
+    - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
     - CMake: https://cmake.org/download/
 
 3. **Install CMake to generate build files.**
