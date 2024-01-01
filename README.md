@@ -1,4 +1,5 @@
 # Image Recognition Project in C++
+
 ## Project Overview
 - This C++ project leverages OpenCV, GLFW, and IMGUI to implement various image recognition features. The project includes the following functionalities:
 
