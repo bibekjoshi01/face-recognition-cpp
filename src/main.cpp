@@ -6,12 +6,135 @@
 #include <fstream>
 #include <ctime>
 #include <vector>
+#include <curl/curl.h>
+#include <string>
+#include <nlohmann/json.hpp> // Include nlohmann/json library
 
+using json = nlohmann::json;
 using namespace std;
 using namespace cv;
 
 bool captureImage = false;
 Mat capturedImage;
+
+static const char *base64_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/";
+
+std::string base64_encode(unsigned char const *bytes_to_encode, unsigned int in_len)
+{
+    std::string ret;
+    int i = 0;
+    int j = 0;
+    unsigned char char_array_3[3];
+    unsigned char char_array_4[4];
+
+    while (in_len--)
+    {
+        char_array_3[i++] = *(bytes_to_encode++);
+        if (i == 3)
+        {
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+            char_array_4[3] = char_array_3[2] & 0x3f;
+
+            for (i = 0; (i < 4); i++)
+                ret += base64_chars[char_array_4[i]];
+            i = 0;
+        }
+    }
+
+    if (i)
+    {
+        for (j = i; j < 3; j++)
+            char_array_3[j] = '\0';
+
+        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+        char_array_4[3] = char_array_3[2] & 0x3f;
+
+        for (j = 0; (j < i + 1); j++)
+            ret += base64_chars[char_array_4[j]];
+
+        while ((i++ < 3))
+            ret += '=';
+    }
+
+    return ret;
+}
+
+// Helper function to encode the image to base64
+string image_to_base64(const cv::Mat &img)
+{
+    vector<uchar> buf;
+    cv::imencode(".jpg", img, buf);
+    auto *enc_msg = reinterpret_cast<unsigned char *>(buf.data());
+    string encoded = base64_encode(enc_msg, buf.size()); // You need to implement base64_encode
+    return encoded;
+}
+
+// Function to handle the HTTP response
+size_t write_callback(void *contents, size_t size, size_t nmemb, string *s)
+{
+    size_t newLength = size * nmemb;
+    try
+    {
+        s->append((char *)contents, newLength);
+    }
+    catch (std::bad_alloc &e)
+    {
+        // Handle memory problem
+        return 0;
+    }
+    return newLength;
+}
+
+// Function to send image to server and receive detected emotion
+string detectEmotion(const cv::Mat &faceImage)
+{
+    CURL *curl;
+    CURLcode res;
+    string response_string;
+    string header_string;
+    string encoded_image = image_to_base64(faceImage);
+
+    curl_global_init(CURL_GLOBAL_ALL);
+    curl = curl_easy_init();
+
+    if (curl)
+    {
+        string url = "http://localhost:3000/recognize";
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+
+        json j;
+        j["imageBuffer"] = encoded_image;
+        string postData = j.dump();
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK)
+        {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        }
+
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+        curl_global_cleanup();
+    }
+    std::cout << "Value: " << response_string << "\nType: " << typeid(response_string).name() << std::endl;
+
+    return response_string;
+}
 
 bool compareFacesUsingHistogram(const cv::Mat &face1, const cv::Mat &face2)
 {
@@ -154,13 +277,25 @@ void detectEyes(Mat &img, Rect face, CascadeClassifier &eyes_cascade)
     }
 }
 
+void detectSmile(Mat &img, Rect face, CascadeClassifier &smile_cascade)
+{
+    Mat ROI = img(face);
+    vector<Rect> smiles;
+    smile_cascade.detectMultiScale(ROI, smiles, 1.20, 5, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+
+    for (const Rect &smile : smiles)
+    {
+        Point center(face.x + smile.x + smile.width / 2, face.y + smile.y + smile.height / 2);
+        ellipse(img, center, Size(smile.width / 2, smile.height / 2), 0, 0, 360, Scalar(255, 0, 0), 4);
+    }
+}
+
 int main()
 {
 
     VideoCapture video(0);
     namedWindow("Camera", cv::WINDOW_NORMAL);
-    CascadeClassifier facedetect;
-    CascadeClassifier eyes_cascade;
+    CascadeClassifier facedetect, eyes_cascade, smile_cascade;
 
     if (!video.isOpened())
     {
@@ -171,7 +306,8 @@ int main()
     setMouseCallback("Camera", onMouse, NULL);
 
     if (!facedetect.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/lbpcascade_frontalface_improved.xml") ||
-        !eyes_cascade.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/haarcascade_eye.xml"))
+        !eyes_cascade.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/haarcascade_eye.xml") ||
+        !smile_cascade.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/haarcascade_smile.xml"))
     {
         std::cout << "Error: Couldn't load one or more cascade classifiers." << endl;
         return -1;
@@ -215,6 +351,23 @@ int main()
             std::cout << "Photo captured and saved as " << imageName << endl;
             // Reset the capture flag
             captureImage = false;
+
+            std::string rawJsonResponse = detectEmotion(capturedImage);
+
+            // Parse the JSON response
+            json jsonResponse = json::parse(rawJsonResponse);
+
+            // Access the values from the parsed JSON
+            std::string detectedEmotion = jsonResponse["emotion"];
+            double emotionScore = jsonResponse["score"];
+
+            // emotion detection
+            cv::namedWindow("Emotion Info", cv::WINDOW_AUTOSIZE);
+            cv::putText(capturedImage, "Detected Emotion: " + detectedEmotion, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
+            cv::putText(capturedImage, "Score: " + std::to_string(emotionScore), cv::Point(10, 70), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
+            cv::imshow("Emotion Info", capturedImage);
+
+            cv::waitKey(0);
 
             // cv::Rect largestFaceInCaptured = detectLargestFace(capturedImage, facedetect);
             // cv::Rect largestFaceInBibek = detectLargestFace(bibekImage, facedetect);
@@ -260,13 +413,14 @@ int main()
             putText(img, to_string(faces.size()) + " Face Found", Point(10, 40), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 1);
             // Draw facial features
             detectEyes(img, face, eyes_cascade);
+            detectSmile(img, face, smile_cascade);
         }
+
+        imshow("Camera", img);
 
         // Get the current size of the window
         // double window_width = cv::getWindowProperty("Camera", cv::WND_PROP_AUTOSIZE);
         // double window_height = cv::getWindowProperty("Camera", cv::WND_PROP_AUTOSIZE);
-
-        imshow("Camera", img);
 
         // Wait for a short time and check if the user has closed the window
         if (cv::waitKey(1) == 27 || cv::getWindowProperty("Camera", cv::WND_PROP_VISIBLE) < 1)
