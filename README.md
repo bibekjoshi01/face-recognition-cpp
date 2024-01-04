@@ -7,24 +7,37 @@
     2. Feature (Eyes, Mouth) Detection
     3. Image Capture
     4. Face Recognition
-    5. Facial Emotion Detection (Additional)
+    5. Facial Emotion Detection
 
 ## Prerequisites
 Before running the project, ensure you have the following dependencies installed:
 
 1. **C++ Compiler: MinGW**
-    - Add the MinGW bin directory to the system's environment variables (e.g., C:\MinGW\bin).
     - MINGW: https://sourceforge.net/projects/mingw/
-
-2. **Install or Extract OpenCV to the C:\ directory.**
     - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
+
+2. **OpenCV**
+    - Download or extract OpenCV to the C:\ directory.
+    - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
+
+3. **CMake**
     - CMake: https://cmake.org/download/
 
-3. **Install CMake to generate build files.**
+4. **IMGUI and GLFW:**
+    - IMGUI and GLFW libraries are included within the project, so there's no need to install them separately.
+    - IMGUI: https://github.com/ocornut/imgui
     - GLFW: https://www.glfw.org/
-    - GLFW is used for window creation.
 
-4. **IMGUI GitHub:** https://github.com/ocornut/imgui
+5. **Visual Studio 17 (2022) Community**
+    - Download: https://visualstudio.microsoft.com/downloads/
+    - Install Visual Studio 2017 or 2022.
+    - Ensure to include the "Desktop development with C++" workload during installation.
+
+6. **Visual Studio Code with Necessary Extension**
+    - Install Visual Studio Code from: https://code.visualstudio.com/
+    - Extensions: C/C++, CMake, CMake Tools,
+    - In the CMake configuration in Visual Studio Code, select 'Visual Studio Build Tools 2022 amd64' as the generator and opt for the 'Debug' mode.
+    - **Note:** Ensure that you have the necessary C++ extensions installed in Visual Studio Code for a smoother development experience.
 
 ## Setting Up the Project
 
