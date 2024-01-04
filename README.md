@@ -1,98 +1,111 @@
 # Image Recognition Project in C++
 
 ## Project Overview
-- This C++ project leverages OpenCV, GLFW, and IMGUI to implement various image recognition features. The project includes the following functionalities:   
 
-    1. Face Detection
-    2. Feature (Eyes, Mouth) Detection
-    3. Image Capture
-    4. Face Recognition
-    5. Facial Emotion Detection
+- This C++ project leverages OpenCV, GLFW, and IMGUI to implement various image recognition features. The project includes the following functionalities:
+
+  1. Face Detection
+  2. Feature (Eyes, Mouth) Detection
+  3. Image Capture
+  4. Face Recognition
+  5. Facial Emotion Detection
 
 ## Prerequisites
+
 Before running the project, ensure you have the following dependencies installed:
 
 1. **C++ Compiler: MinGW**
-    - MINGW: https://sourceforge.net/projects/mingw/
-    - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
+
+   - MINGW: https://sourceforge.net/projects/mingw/
+   - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
 
 2. **OpenCV**
-    - Download or extract OpenCV to the C:\ directory.
-    - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
+
+   - Download or extract OpenCV to the C:\ directory.
+   - Add the OpenCV bin directory to the system's environment variables (e.g., C:\opencv\build\x64\vc16\bin).
 
 3. **CMake**
-    - CMake: https://cmake.org/download/
+
+   - CMake: https://cmake.org/download/
 
 4. **IMGUI and GLFW:**
-    - IMGUI and GLFW libraries are included within the project, so there's no need to install them separately.
-    - IMGUI: https://github.com/ocornut/imgui
-    - GLFW: https://www.glfw.org/
+
+   - IMGUI and GLFW libraries are included within the project, so there's no need to install them separately.
+   - IMGUI: https://github.com/ocornut/imgui
+   - GLFW: https://www.glfw.org/
 
 5. **Visual Studio 17 (2022) Community**
-    - Download: https://visualstudio.microsoft.com/downloads/
-    - Install Visual Studio 2017 or 2022.
-    - Ensure to include the "Desktop development with C++" workload during installation.
+
+   - Download: https://visualstudio.microsoft.com/downloads/
+   - Install Visual Studio 2017 or 2022.
+   - Ensure to include the "Desktop development with C++" workload during installation.
 
 6. **Visual Studio Code with Necessary Extension**
-    - Install Visual Studio Code from: https://code.visualstudio.com/
-    - Extensions: C/C++, CMake, CMake Tools,
-    - In the CMake configuration in Visual Studio Code, select 'Visual Studio Build Tools 2022 amd64' as the generator and opt for the 'Debug' mode.
-    - **Note:** Ensure that you have the necessary C++ extensions installed in Visual Studio Code for a smoother development experience.
 
-## Setting Up the Project
+   - Install Visual Studio Code from: https://code.visualstudio.com/
+   - Extensions: C/C++, CMake, CMake Tools,
+   - In the CMake configuration in Visual Studio Code, select 'Visual Studio Build Tools 2022 amd64' as the generator and opt for the 'Debug' mode.
+   - **Note:** Ensure that you have the necessary C++ extensions installed in Visual Studio Code for a smoother development experience.
 
-1. Configure C++ Compiler:
-    - Install MinGW and add its bin directory to the system's PATH.
+7. **Download Other Dependencise CURL and NLOHMANN JSON**
 
-2. Configure OpenCV:
-    - Install or extract OpenCV to the C:\ directory.
-    - Add the OpenCV bin directory to the system's PATH.
+   - To install libcurl and nlohmann/json (json.hpp), you have a few options depending on your development environment and how you prefer to manage dependencies.
 
-3. Download CMake and CMakeLists Extension for VSCode:
-    - Install CMake and the CMake extension in Visual Studio Code for easy project configuration.
+   On Ubuntu, you can install libcurl with apt:
 
-4. Download Other Dependencise CURL and JSON
-    - To install libcurl and nlohmann/json (json.hpp), you have a few options depending on your development environment and how you prefer to manage dependencies.
+   - sudo apt-get install libcurl4-openssl-dev
+     On Windows, you can use vcpkg, a package manager for C++ libraries:
+   - vcpkg install curl
 
-    On Ubuntu, you can install libcurl with apt:
-    - sudo apt-get install libcurl4-openssl-dev
-    On Windows, you can use vcpkg, a package manager for C++ libraries:
-    - vcpkg install curl
+   On Ubuntu, you can install it with apt:
 
-    On Ubuntu, you can install it with apt:
-    - sudo apt-get install nlohmann-json3-dev
+   - sudo apt-get install nlohmann-json3-dev
 
-    On Windows, with vcpkg:
-    - vcpkg install nlohmann-json
+   On Windows, with vcpkg:
 
+   - vcpkg install nlohmann-json
 
 ## Installing vcpkg on Windows:
 
-1. Clone vcpkg: You need to clone vcpkg from its GitHub repository
-    - Open a command prompt and run:
-        git clone https://github.com/Microsoft/vcpkg.git
-        cd vcpkg
+vcpkg is a free C/C++ package manager for acquiring and managing libraries.
 
-2. Bootstrap vcpkg: Run the bootstrap script:
-    - .\bootstrap-vcpkg.bat
+1. Clone vcpkg:
+
+   - Begin by cloning vcpkg from its GitHub repository:
+   - Open a command prompt and run:
+
+   ```bash git clone https://github.com/Microsoft/vcpkg.git
+   cd vcpkg
+   ```
+
+2. Bootstrap vcpkg:
+
+   - Execute the bootstrap script to set up vcpkg:
+   - .\bootstrap-vcpkg.bat
 
 3. Integrate vcpkg with Visual Studio:
-    - After bootstrapping, you can integrate vcpkg with Visual Studio to make the installed libraries available globally:
-    - .\vcpkg integrate install
+
+   - After bootstrapping, seamlessly integrate vcpkg with Visual Studio to make the installed libraries globally available.
+   - .\vcpkg integrate install
 
 4. Add vcpkg to PATH (Optional):
-    - For convenience, you can add the vcpkg executable to your system's PATH environment variable. 
 
-5. Build the project: Then you can build the project with CMake as usual.
-    -  you are using VS Code with CMake Tools extension, you might need to configure the settings.json for your workspace to include the toolchain file:
+   - For convenience, you can add the vcpkg executable to your system's PATH environment variable.
 
-    {
-        "cmake.configureSettings": {
-            "CMAKE_TOOLCHAIN_FILE": "C:/Users/Bibek Joshi/Desktop/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        }
-    }
+5. Build the project:
+
+   - Proceed to build your project using CMake as usual.
+   - you are using VS Code with CMake Tools extension, you might need to configure the .vscode/settings.json for your workspace to include the toolchain file:
+
+   ```{
+       "cmake.configureSettings": {
+           "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+       }
+   }
+   ```
 
 ## Building and Running the Project
+
     - Build the Project: Use CMake to generate build files.
 
 # Explore Image Recognition:
