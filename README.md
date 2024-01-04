@@ -10,6 +10,7 @@
   4. Face Recognition
   5. Facial Emotion Detection
 
+
 ## Prerequisites
 
 Before running the project, ensure you have the following dependencies installed:
@@ -48,22 +49,17 @@ Before running the project, ensure you have the following dependencies installed
    - **Note:** Ensure that you have the necessary C++ extensions installed in Visual Studio Code for a smoother development experience.
 
 7. **Download Other Dependencise CURL and NLOHMANN JSON**
+To install libcurl and nlohmann/json (json.hpp), follow the steps below based on your development environment.
 
-   - To install libcurl and nlohmann/json (json.hpp), you have a few options depending on your development environment and how you prefer to manage dependencies.
+   - Install libcurl:
+   ```
+   vcpkg install curl
+   ```
+   - Install nlohmann/json:
+   ```
+   vcpkg install nlohmann-json
+   ```
 
-   On Ubuntu, you can install libcurl with apt:
-
-   - sudo apt-get install libcurl4-openssl-dev
-     On Windows, you can use vcpkg, a package manager for C++ libraries:
-   - vcpkg install curl
-
-   On Ubuntu, you can install it with apt:
-
-   - sudo apt-get install nlohmann-json3-dev
-
-   On Windows, with vcpkg:
-
-   - vcpkg install nlohmann-json
 
 ## Installing vcpkg on Windows:
 
@@ -74,7 +70,8 @@ vcpkg is a free C/C++ package manager for acquiring and managing libraries.
    - Begin by cloning vcpkg from its GitHub repository:
    - Open a command prompt and run:
 
-   ```bash git clone https://github.com/Microsoft/vcpkg.git
+   ```
+   bash git clone https://github.com/Microsoft/vcpkg.git
    cd vcpkg
    ```
 
@@ -97,16 +94,19 @@ vcpkg is a free C/C++ package manager for acquiring and managing libraries.
    - Proceed to build your project using CMake as usual.
    - you are using VS Code with CMake Tools extension, you might need to configure the .vscode/settings.json for your workspace to include the toolchain file:
 
-   ```{
+   ```
+   {
        "cmake.configureSettings": {
            "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
        }
    }
    ```
 
+
 ## Building and Running the Project
 
     - Build the Project: Use CMake to generate build files.
+
 
 # Explore Image Recognition:
 
