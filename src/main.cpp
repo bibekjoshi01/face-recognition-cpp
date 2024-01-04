@@ -2,7 +2,7 @@
 #include <opencv2/objdetect.hpp>
 #include <opencv2/imgproc.hpp>
 #include <iostream>
-#include <opencv2\opencv.hpp>
+#include <opencv2/opencv.hpp>
 #include <fstream>
 #include <ctime>
 #include <vector>
@@ -72,7 +72,7 @@ string image_to_base64(const cv::Mat &img)
     vector<uchar> buf;
     cv::imencode(".jpg", img, buf);
     auto *enc_msg = reinterpret_cast<unsigned char *>(buf.data());
-    string encoded = base64_encode(enc_msg, buf.size()); // You need to implement base64_encode
+    string encoded = base64_encode(enc_msg, buf.size());
     return encoded;
 }
 
@@ -352,6 +352,7 @@ int main()
             // Reset the capture flag
             captureImage = false;
 
+            // Call the Emotion Detect Function
             std::string rawJsonResponse = detectEmotion(capturedImage);
 
             // Parse the JSON response
@@ -361,7 +362,7 @@ int main()
             std::string detectedEmotion = jsonResponse["emotion"];
             double emotionScore = jsonResponse["score"];
 
-            // emotion detection
+            // Show the Detected Emotion in New Window
             cv::namedWindow("Emotion Info", cv::WINDOW_AUTOSIZE);
             cv::putText(capturedImage, "Detected Emotion: " + detectedEmotion, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
             cv::putText(capturedImage, "Score: " + std::to_string(emotionScore), cv::Point(10, 70), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
@@ -400,6 +401,7 @@ int main()
             // }
         }
 
+        // Face Detecting Code For multiple faces
         vector<Rect> faces;
         facedetect.detectMultiScale(img, faces, 1.3, 5);
 
@@ -417,10 +419,6 @@ int main()
         }
 
         imshow("Camera", img);
-
-        // Get the current size of the window
-        // double window_width = cv::getWindowProperty("Camera", cv::WND_PROP_AUTOSIZE);
-        // double window_height = cv::getWindowProperty("Camera", cv::WND_PROP_AUTOSIZE);
 
         // Wait for a short time and check if the user has closed the window
         if (cv::waitKey(1) == 27 || cv::getWindowProperty("Camera", cv::WND_PROP_VISIBLE) < 1)
