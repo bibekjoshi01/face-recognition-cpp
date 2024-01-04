@@ -18,6 +18,7 @@ set(nlohmann_json_DIR "C:/Users/Bibek Joshi/Desktop/vcpkg/installed/x64-windows/
 find_package(nlohmann_json CONFIG REQUIRED)
 
 # Find CURL
+set(CURL_INCLUDE_DIR "C:/Users/Bibek Joshi/Desktop/vcpkg/installed/x64-windows/share/curl")
 find_package(CURL REQUIRED)
 
 # Add ImGui and its backends

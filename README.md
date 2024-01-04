@@ -49,7 +49,7 @@ Before running the project, ensure you have the following dependencies installed
    - **Note:** Ensure that you have the necessary C++ extensions installed in Visual Studio Code for a smoother development experience.
 
 7. **Download Other Dependencise CURL and NLOHMANN JSON**
-To install libcurl and nlohmann/json (json.hpp), follow the steps below based on your development environment.
+    - To install libcurl and nlohmann/json (json.hpp), follow the steps below based on your development environment.
 
    - Install libcurl:
    ```
