@@ -8,429 +8,414 @@
 #include <vector>
 #include <curl/curl.h>
 #include <string>
-#include <nlohmann/json.hpp> // Include nlohmann/json library
+// Include nlohmann/json library
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-using namespace std;
+using std::string;
+using std::vector;
 using namespace cv;
+using namespace std;
 
-bool captureImage = false;
-Mat capturedImage;
-
-static const char *base64_chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz"
-    "0123456789+/";
-
-std::string base64_encode(unsigned char const *bytes_to_encode, unsigned int in_len)
+class EmotionDetector
 {
-    std::string ret;
-    int i = 0;
-    int j = 0;
-    unsigned char char_array_3[3];
-    unsigned char char_array_4[4];
-
-    while (in_len--)
+public:
+    EmotionDetector()
     {
-        char_array_3[i++] = *(bytes_to_encode++);
-        if (i == 3)
+        curl_global_init(CURL_GLOBAL_ALL); //  application initialization
+    }
+
+    ~EmotionDetector()
+    {
+        curl_global_cleanup(); //  application cleanup
+    }
+
+    std::string detect(const cv::Mat &faceImage)
+    {
+        CURL *curl = curl_easy_init();
+        if (!curl)
         {
+            std::cerr << "Curl initialization failed." << std::endl;
+            return "";
+        }
+
+        std::string response_string;
+        std::string encoded_image = image_to_base64(faceImage);
+
+        std::string url = "http://localhost:3000/recognize";
+        struct curl_slist *headers = nullptr;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+
+        json j;
+        j["imageBuffer"] = encoded_image;
+        std::string postData = j.dump();
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK)
+        {
+            std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        }
+
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+
+        return response_string;
+    }
+
+private:
+    static size_t write_callback(void *contents, size_t size, size_t nmemb, std::string *s)
+    {
+        size_t newLength = size * nmemb;
+        try
+        {
+            s->append((char *)contents, newLength);
+        }
+        catch (std::bad_alloc &e)
+        {
+            // Handle memory problem
+            return 0;
+        }
+        return newLength;
+    }
+
+    std::string base64_encode(unsigned char const *bytes_to_encode, unsigned int in_len)
+    {
+        static const char *base64_chars =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789+/";
+
+        std::string ret;
+        int i = 0;
+        int j = 0;
+        unsigned char char_array_3[3];
+        unsigned char char_array_4[4];
+
+        while (in_len--)
+        {
+            char_array_3[i++] = *(bytes_to_encode++);
+            if (i == 3)
+            {
+                char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+                char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+                char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+                char_array_4[3] = char_array_3[2] & 0x3f;
+
+                for (i = 0; (i < 4); i++)
+                    ret += base64_chars[char_array_4[i]];
+                i = 0;
+            }
+        }
+
+        if (i)
+        {
+            for (j = i; j < 3; j++)
+                char_array_3[j] = '\0';
+
             char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
             char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
             char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
             char_array_4[3] = char_array_3[2] & 0x3f;
 
-            for (i = 0; (i < 4); i++)
-                ret += base64_chars[char_array_4[i]];
-            i = 0;
+            for (j = 0; (j < i + 1); j++)
+                ret += base64_chars[char_array_4[j]];
+
+            while ((i++ < 3))
+                ret += '=';
         }
+
+        return ret;
     }
 
-    if (i)
+    std::string image_to_base64(const cv::Mat &img)
     {
-        for (j = i; j < 3; j++)
-            char_array_3[j] = '\0';
-
-        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-        char_array_4[3] = char_array_3[2] & 0x3f;
-
-        for (j = 0; (j < i + 1); j++)
-            ret += base64_chars[char_array_4[j]];
-
-        while ((i++ < 3))
-            ret += '=';
+        std::vector<uchar> buf;
+        cv::imencode(".jpg", img, buf);
+        auto *enc_msg = reinterpret_cast<unsigned char *>(buf.data());
+        return base64_encode(enc_msg, buf.size());
     }
+};
 
-    return ret;
-}
-
-// Helper function to encode the image to base64
-string image_to_base64(const cv::Mat &img)
+// Base Abstract Class Feature Detector Definition
+class Detector
 {
-    vector<uchar> buf;
-    cv::imencode(".jpg", img, buf);
-    auto *enc_msg = reinterpret_cast<unsigned char *>(buf.data());
-    string encoded = base64_encode(enc_msg, buf.size());
-    return encoded;
-}
+protected:
+    CascadeClassifier classifier;
 
-// Function to handle the HTTP response
-size_t write_callback(void *contents, size_t size, size_t nmemb, string *s)
-{
-    size_t newLength = size * nmemb;
-    try
+public:
+    Detector(const string &classifierPath)
     {
-        s->append((char *)contents, newLength);
-    }
-    catch (std::bad_alloc &e)
-    {
-        // Handle memory problem
-        return 0;
-    }
-    return newLength;
-}
-
-// Function to send image to server and receive detected emotion
-string detectEmotion(const cv::Mat &faceImage)
-{
-    CURL *curl;
-    CURLcode res;
-    string response_string;
-    string header_string;
-    string encoded_image = image_to_base64(faceImage);
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl = curl_easy_init();
-
-    if (curl)
-    {
-        string url = "http://localhost:3000/recognize";
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-
-        json j;
-        j["imageBuffer"] = encoded_image;
-        string postData = j.dump();
-
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK)
+        if (!classifier.load(classifierPath))
         {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            std::cout << "Error loading classifier from " << classifierPath << std::endl;
         }
-
-        curl_easy_cleanup(curl);
-        curl_slist_free_all(headers);
-        curl_global_cleanup();
     }
-    std::cout << "Value: " << response_string << "\nType: " << typeid(response_string).name() << std::endl;
 
-    return response_string;
-}
+    // Pure virtual function for detection
+    virtual void detect(const Mat &img) = 0;
+};
 
-bool compareFacesUsingHistogram(const cv::Mat &face1, const cv::Mat &face2)
+// Face Detection Class Definition
+class FaceDetector : public Detector
 {
-    cv::Mat hist1, hist2;
-    int histSize = 256;
-    float range[] = {0, 256};
-    const float *histRange = {range};
+private:
+    std::vector<cv::Rect> lastDetectedFaces;
 
-    // Convert to grayscale only if they are not already
-    cv::Mat gray1, gray2;
-    if (face1.channels() == 3)
+public:
+    FaceDetector(const std::string &classifierPath) : Detector(classifierPath){};
+
+    void detect(const Mat &img) override
     {
-        cvtColor(face1, gray1, cv::COLOR_BGR2GRAY);
-    }
-    else
-    {
-        gray1 = face1.clone();
-    }
-
-    if (face2.channels() == 3)
-    {
-        cvtColor(face2, gray2, cv::COLOR_BGR2GRAY);
-    }
-    else
-    {
-        gray2 = face2.clone();
-    }
-
-    // Calculate the histograms
-    calcHist(&gray1, 1, 0, cv::Mat(), hist1, 1, &histSize, &histRange, true, false);
-    calcHist(&gray2, 1, 0, cv::Mat(), hist2, 1, &histSize, &histRange, true, false);
-
-    // Normalize the histograms
-    normalize(hist1, hist1, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
-    normalize(hist2, hist2, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
-
-    // Compare using the Chi-Square method
-    double result = compareHist(hist1, hist2, cv::HISTCMP_CHISQR);
-    std::cout << "Histogram similarity: " << result << std::endl;
-
-    // Define a threshold for deciding if the images are similar
-    double similarityThreshold = 0.1; // Adjust this threshold based on your testing
-    return result < similarityThreshold;
-}
-
-cv::Rect detectLargestFace(cv::Mat &img, cv::CascadeClassifier &face_cascade)
-{
-    std::vector<cv::Rect> faces;
-    face_cascade.detectMultiScale(img, faces, 1.3, 5);
-    if (faces.empty())
-    {
-        return cv::Rect(); // Return an empty rect if no faces are found
-    }
-    // Assuming the largest face is the most relevant one
-    return *std::max_element(faces.begin(), faces.end(),
-                             [](const cv::Rect &a, const cv::Rect &b)
-                             {
-                                 return a.area() < b.area();
-                             });
-}
-
-bool compareImages(const cv::Mat &img1, const cv::Mat &img2)
-{
-    // Initialize ORB detector
-    cv::Ptr<cv::ORB> orb = cv::ORB::create();
-
-    // Detect keypoints and compute descriptors
-    std::vector<cv::KeyPoint> keypoints1, keypoints2;
-    cv::Mat descriptors1, descriptors2;
-    orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
-    orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
-
-    // Match descriptors using BFMatcher
-    cv::BFMatcher matcher(cv::NORM_HAMMING);
-    std::vector<std::vector<cv::DMatch>> knn_matches;
-    matcher.knnMatch(descriptors1, descriptors2, knn_matches, 2);
-
-    // Filter matches using the Lowe's ratio test
-    const float ratio_thresh = 0.75f;
-    std::vector<cv::DMatch> good_matches;
-    for (size_t i = 0; i < knn_matches.size(); i++)
-    {
-        if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
+        vector<Rect> faces;
+        classifier.detectMultiScale(img, faces, 1.3, 5);
+        for (const auto &face : faces)
         {
-            good_matches.push_back(knn_matches[i][0]);
+            rectangle(img, face.tl(), face.br(), Scalar(50, 50, 255), 2);
         }
+        cout << faces.size() << " face(s) found." << endl;
+        lastDetectedFaces = faces;
     }
 
-    // Check if enough matches are found
-    const int MIN_MATCH_COUNT = 30; // Set a threshold for considering a match
-    if (good_matches.size() >= MIN_MATCH_COUNT)
+    const std::vector<cv::Rect> &getLastDetectedFaces() const
     {
-        // Find homography using RANSAC
-        std::vector<cv::Point2f> pts1, pts2;
-        for (size_t i = 0; i < good_matches.size(); i++)
+        return lastDetectedFaces;
+    }
+};
+
+// Eyes Detection Class Definition
+class EyesDetector : public Detector
+{
+public:
+    EyesDetector(const std::string &classifierPath) : Detector(classifierPath){};
+
+    void detect(const Mat &img) override
+    {
+        //  an empty implementation
+    }
+
+    // This method is specific to EyesDetector and does not override the base class's detect method.
+    void detect(const Mat &img, const Rect &faceRegion)
+    {
+        Mat ROI = img(faceRegion);
+        vector<Rect> eyes;
+        classifier.detectMultiScale(ROI, eyes, 1.20, 5, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+        for (const auto &e : eyes)
         {
-            pts1.push_back(keypoints1[good_matches[i].queryIdx].pt);
-            pts2.push_back(keypoints2[good_matches[i].trainIdx].pt);
+            Rect eyeRect(faceRegion.x + e.x, faceRegion.y + e.y, e.width, e.height);
+            rectangle(img, eyeRect.tl(), eyeRect.br(), Scalar(0, 255, 0), 2);
         }
-        cv::Mat mask;
-        cv::findHomography(pts1, pts2, cv::RANSAC, 5.0, mask); // 5.0 is the RANSAC reprojection threshold
+    }
+};
 
-        // Count inliers (matches that are geometrically consistent)
-        int inliers = 0;
-        for (int i = 0; i < mask.rows; ++i)
+// Smile Detection Class Definition
+class SmileDetector : public Detector
+{
+public:
+    SmileDetector(const std::string &classifierPath) : Detector(classifierPath){};
+
+    void detect(const Mat &img) override
+    {
+        //  an empty implementation
+    }
+
+    // This method is specific to SmileDetector and does not override the base class's detect method.
+    void detect(const Mat &img, const Rect &faceRegion)
+    {
+        Mat ROI = img(faceRegion);
+        vector<Rect> smiles;
+        classifier.detectMultiScale(ROI, smiles, 1.7, 20, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+        for (const auto &smile : smiles)
         {
-            if (mask.at<uchar>(i))
-            {
-                inliers++;
-            }
-        }
-
-        // If enough inliers are found, then the images are a match
-        if (inliers >= MIN_MATCH_COUNT)
-        {
-            return true;
+            Point center(faceRegion.x + smile.x + smile.width / 2, faceRegion.y + smile.y + smile.height / 2);
+            ellipse(img, center, Size(smile.width / 2, smile.height / 2), 0, 0, 360, Scalar(255, 0, 0), 4);
         }
     }
-    return false;
-}
+};
 
-void onMouse(int event, int x, int y, int flags, void *userdata)
+// Displaying Detected Image Emotion
+void annotateAndDisplayImage(cv::Mat &image, const std::string &emotion, double score)
 {
-    if (event == EVENT_LBUTTONDOWN)
-    {
-        captureImage = true;
-    }
-}
+    const std::string emWin = "Emotion";
+    cv::Mat displayImage;
+    double scaleFactor = 1.0; // Adjust based on your needs
+    cv::resize(image, displayImage, cv::Size(), scaleFactor, scaleFactor);
 
-void detectEyes(Mat &img, Rect face, CascadeClassifier &eyes_cascade)
-{
-    Mat ROI = img(face);
-    vector<Rect> eyes;
-    eyes_cascade.detectMultiScale(ROI, eyes, 1.20, 5, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+    // Annotate the resized image with the detected emotion and score.
+    cv::putText(displayImage, "Detected Emotion: " + emotion, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
+    cv::putText(displayImage, "Score: " + std::to_string(score), cv::Point(10, 70), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
 
-    for (const Rect &e : eyes)
-    {
-        Rect eyeRect(face.x + e.x, face.y + e.y, e.width, e.height);
-        rectangle(img, eyeRect.tl(), eyeRect.br(), Scalar(0, 255, 0), 2);
-    }
-}
+    // Display the annotated image.
+    cv::imshow(emWin, displayImage);
 
-void detectSmile(Mat &img, Rect face, CascadeClassifier &smile_cascade)
-{
-    Mat ROI = img(face);
-    vector<Rect> smiles;
-    smile_cascade.detectMultiScale(ROI, smiles, 1.20, 5, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
-
-    for (const Rect &smile : smiles)
-    {
-        Point center(face.x + smile.x + smile.width / 2, face.y + smile.y + smile.height / 2);
-        ellipse(img, center, Size(smile.width / 2, smile.height / 2), 0, 0, 360, Scalar(255, 0, 0), 4);
-    }
-}
-
-int main()
-{
-
-    VideoCapture video(0);
-    namedWindow("Camera", cv::WINDOW_NORMAL);
-    CascadeClassifier facedetect, eyes_cascade, smile_cascade;
-
-    if (!video.isOpened())
-    {
-        std::cout << "Error: Couldn't open the camera." << endl;
-        return -1;
-    }
-
-    setMouseCallback("Camera", onMouse, NULL);
-
-    if (!facedetect.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/lbpcascade_frontalface_improved.xml") ||
-        !eyes_cascade.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/haarcascade_eye.xml") ||
-        !smile_cascade.load("C:/Users/Bibek Joshi/Desktop/ImageRecognition/data/haarcascades/haarcascade_smile.xml"))
-    {
-        std::cout << "Error: Couldn't load one or more cascade classifiers." << endl;
-        return -1;
-    }
-
-    Mat img;
-    ofstream csvFile("C:/Users/Bibek Joshi/Desktop/ImageRecognition/images/data.csv", ios::app);
-
-    cv::Mat bibekImage = cv::imread("C:/Users/Bibek Joshi/Desktop/ImageRecognition/images/bibek.jpg", cv::IMREAD_GRAYSCALE);
-
+    // Wait for ESC key (27) before closing.
     while (true)
     {
-        video.read(img);
-
-        // Check if the frame is empty
-        if (img.empty())
+        char key = cv::waitKey(1);
+        if (key == 27 || cv::getWindowProperty(emWin, cv::WND_PROP_VISIBLE) < 1)
         {
-            std::cout << "Error: Couldn't read frame from the camera." << endl;
             break;
-        }
-
-        if (captureImage)
-        {
-            // Copy the image for display in the prompt window
-            capturedImage = img.clone();
-
-            // Get the current time
-            std::time_t now = std::time(nullptr);
-
-            // Convert to local time
-            std::tm ltm;
-            localtime_s(&ltm, &now); // Correct usage of localtime_s
-
-            // Create a timestamp string
-            char timestamp[20];
-            std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", &ltm);
-
-            // Save image
-            string imageName = "C:/Users/Bibek Joshi/Desktop/ImageRecognition/images/captured_photo_" + string(timestamp) + ".jpg";
-            imwrite(imageName, capturedImage);
-            std::cout << "Photo captured and saved as " << imageName << endl;
-            // Reset the capture flag
-            captureImage = false;
-
-            // Call the Emotion Detect Function
-            std::string rawJsonResponse = detectEmotion(capturedImage);
-
-            // Parse the JSON response
-            json jsonResponse = json::parse(rawJsonResponse);
-
-            // Access the values from the parsed JSON
-            std::string detectedEmotion = jsonResponse["emotion"];
-            double emotionScore = jsonResponse["score"];
-
-            // Show the Detected Emotion in New Window
-            cv::namedWindow("Emotion Info", cv::WINDOW_AUTOSIZE);
-            cv::putText(capturedImage, "Detected Emotion: " + detectedEmotion, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
-            cv::putText(capturedImage, "Score: " + std::to_string(emotionScore), cv::Point(10, 70), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
-            cv::imshow("Emotion Info", capturedImage);
-
-            cv::waitKey(0);
-
-            // cv::Rect largestFaceInCaptured = detectLargestFace(capturedImage, facedetect);
-            // cv::Rect largestFaceInBibek = detectLargestFace(bibekImage, facedetect);
-
-            // if (!largestFaceInCaptured.empty() && !largestFaceInBibek.empty())
-            // {
-            //     // Crop the detected faces
-            //     cv::Mat faceCaptured = capturedImage(largestFaceInCaptured);
-            //     cv::Mat faceBibek = bibekImage(largestFaceInBibek);
-            //     bool isMatch = compareFacesUsingHistogram(faceCaptured, faceBibek);
-            //     std::cout << "Image Compare: " << (isMatch ? "Match found." : "No match found.") << std::endl;
-            // }
-            // else
-            // {
-            //     std::cout << "Face not detected in one or both images." << std::endl;
-            // }
-
-            // if (compareImages(capturedImage, bibekImage))
-            // {
-            //     // If a match is found, display the image in a new window
-            //     cv::namedWindow("Matched Image", cv::WINDOW_AUTOSIZE);
-            //     cv::imshow("Matched Image", bibekImage);
-            //     cv::waitKey(0); // Wait for a key press to close the window
-            // }
-            // else
-            // {
-            //     cv::namedWindow("No Match Found", cv::WINDOW_AUTOSIZE);
-            //     cv::imshow("No Match Found", capturedImage);
-            //     cv::waitKey(0); // Wait for a key press to close the window
-            // }
-        }
-
-        // Face Detecting Code For multiple faces
-        vector<Rect> faces;
-        facedetect.detectMultiScale(img, faces, 1.3, 5);
-
-        std::cout << faces.size() << " face(s) found." << endl;
-
-        for (const Rect &face : faces)
-        {
-            // Use the rectangle function from the imgproc namespace
-            rectangle(img, face.tl(), face.br(), Scalar(50, 50, 255), 2);
-            cv::rectangle(img, Point(0, 0), Point(250, 70), Scalar(50, 50, 255), FILLED);
-            putText(img, to_string(faces.size()) + " Face Found", Point(10, 40), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 1);
-            // Draw facial features
-            detectEyes(img, face, eyes_cascade);
-            detectSmile(img, face, smile_cascade);
-        }
-
-        imshow("Camera", img);
-
-        // Wait for a short time and check if the user has closed the window
-        if (cv::waitKey(1) == 27 || cv::getWindowProperty("Camera", cv::WND_PROP_VISIBLE) < 1)
-        {
-            break; // Break the loop if the user presses 'Esc' or closes the window
         }
     }
 
-    // After breaking out of the loop, release the VideoCapture object and destroy all windows
-    video.release();
-    cv::destroyAllWindows();
+    cv::destroyWindow(emWin); // Explicitly destroy the window.
+}
 
-    csvFile.close();
+// Video Handler Class Definition
+class VideoHandler
+{
+private:
+    static VideoHandler *instance;
+    cv::VideoCapture video;
+    std::string windowName;
+    bool captureImage;
+
+    static void onMouse(int event, int x, int y, int flags, void *userdata)
+    {
+        if (event == cv::EVENT_LBUTTONDOWN)
+        {
+            instance->captureImage = true;
+        }
+    }
+
+    // Image Capturing and Saving
+    void captureAndSaveImage(const cv::Mat &frame)
+    {
+        // Generate timestamp for filename
+        std::time_t now = std::time(nullptr);
+        char timestamp[20];
+        std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", std::localtime(&now));
+        std::string filename = "captured_" + std::string(timestamp) + ".jpg";
+
+        // Save frame to file
+        cv::imwrite(filename, frame);
+        std::cout << "Image saved as " << filename << std::endl;
+    }
+
+public:
+    // Include detector instances
+    FaceDetector faceDetector;
+    EyesDetector eyesDetector;
+    SmileDetector smileDetector;
+    EmotionDetector emotionDetector;
+
+    // Video Handler Constructor
+    VideoHandler(const std::string &windowName, const std::string &faceCascadePath,
+                 const std::string &eyesCascadePath, const std::string &smileCascadePath)
+        : windowName(windowName), captureImage(false),
+          faceDetector(faceCascadePath),
+          eyesDetector(eyesCascadePath),
+          smileDetector(smileCascadePath)
+    {
+        instance = this;
+        cv::namedWindow(windowName, cv::WINDOW_NORMAL);
+        cv::setMouseCallback(windowName, onMouse, nullptr);
+    }
+
+    // Video Handler Destructor
+    ~VideoHandler()
+    {
+        cv::destroyAllWindows();
+    }
+
+    // function to initialize camera
+    bool initializeCamera(int cameraIndex)
+    {
+        video.open(cameraIndex);
+        if (!video.isOpened())
+        {
+            std::cerr << "Error: Couldn't open the camera." << std::endl;
+            return false;
+        }
+        return true;
+    }
+
+    // function to capture the video (Video Loop Frame)
+    void captureLoop()
+    {
+        cv::Mat frame;
+        while (true)
+        {
+            video >> frame;
+            if (frame.empty())
+            {
+                std::cerr << "Error: Couldn't read frame from the camera." << std::endl;
+                break;
+            }
+
+            if (captureImage)
+            {
+                captureAndSaveImage(frame);
+                captureImage = false; // Reset flag
+
+                try
+                {
+                    std::string emotionResponse = emotionDetector.detect(frame); // Detect emotion.
+                    std::cout << "Emotion Response: " << emotionResponse << std::endl;
+
+                    // Assuming detect() returns a JSON string response, parse it.
+                    json jsonResponse = json::parse(emotionResponse);
+
+                    // Extract detected emotion and score from the response.
+                    std::string detectedEmotion = jsonResponse["emotion"];
+                    double emotionScore = jsonResponse["score"];
+
+                    // Optionally, annotate the frame with the detected emotion before displaying it.
+                    annotateAndDisplayImage(frame, detectedEmotion, emotionScore);
+                }
+                catch (const std::exception &e)
+                {
+                    // Handle exceptions, which could be due to network errors, parsing errors, etc.
+                    std::cerr << "Error detecting emotion: " << e.what() << std::endl;
+
+                    // Fallback behavior or error handling.
+                    annotateAndDisplayImage(frame, "Failed", 0.0);
+                }
+            }
+
+            // Detect faces
+            faceDetector.detect(frame);
+            const auto &detectedFaces = faceDetector.getLastDetectedFaces();
+
+            // Detect eyes and smiles within each detected face region
+            for (const auto &face : detectedFaces)
+            {
+                eyesDetector.detect(frame, face);
+                smileDetector.detect(frame, face);
+            }
+
+            cv::imshow(windowName, frame);
+            char key = cv::waitKey(1);
+            if (key == 27 || cv::getWindowProperty(windowName, cv::WND_PROP_VISIBLE) < 1)
+            {
+                break;
+            }
+        }
+    }
+};
+
+// static member initialization
+VideoHandler *VideoHandler::instance = nullptr;
+
+// Main Function Declaration
+int main()
+{
+    const std::string faceCascadePath = "C:/Users/Bibek Joshi/Desktop/TEST/data/haarcascades/lbpcascade_frontalface_improved.xml";
+    const std::string eyesCascadePath = "C:/Users/Bibek Joshi/Desktop/TEST/data/haarcascades/haarcascade_eye.xml";
+    const std::string smileCascadePath = "C:/Users/Bibek Joshi/Desktop/TEST/data/haarcascades/haarcascade_smile.xml";
+
+    // VideoHandle Instance Creation
+    VideoHandler videoHandler("Camera", faceCascadePath, eyesCascadePath, smileCascadePath);
+    if (!videoHandler.initializeCamera(0))
+    {
+        return -1;
+    }
+
+    videoHandler.captureLoop();
     return 0;
 }
