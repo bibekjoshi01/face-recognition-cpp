@@ -17,6 +17,9 @@ using std::vector;
 using namespace cv;
 using namespace std;
 
+const std::string PATH_PREFIX = "C:/Users/Bibek Joshi/Desktop/TEST";
+const std::string CAPTURED_PREFIX = "C:/Users/Bibek Joshi/Desktop/ImageRecognition/images/";
+
 class EmotionDetector
 {
 public:
@@ -286,11 +289,10 @@ private:
     // Image Capturing and Saving
     void captureAndSaveImage(const cv::Mat &frame)
     {
-        // Generate timestamp for filename
         std::time_t now = std::time(nullptr);
         char timestamp[20];
         std::strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", std::localtime(&now));
-        std::string filename = "captured_" + std::string(timestamp) + ".jpg";
+        std::string filename = CAPTURED_PREFIX + "captured_" + std::string(timestamp) + ".jpg";
 
         // Save frame to file
         cv::imwrite(filename, frame);
@@ -405,9 +407,9 @@ VideoHandler *VideoHandler::instance = nullptr;
 // Main Function Declaration
 int main()
 {
-    const std::string faceCascadePath = "C:/Users/Bibek Joshi/Desktop/TEST/data/haarcascades/lbpcascade_frontalface_improved.xml";
-    const std::string eyesCascadePath = "C:/Users/Bibek Joshi/Desktop/TEST/data/haarcascades/haarcascade_eye.xml";
-    const std::string smileCascadePath = "C:/Users/Bibek Joshi/Desktop/TEST/data/haarcascades/haarcascade_smile.xml";
+    const std::string faceCascadePath = PATH_PREFIX + "/data/haarcascades/lbpcascade_frontalface_improved.xml";
+    const std::string eyesCascadePath = PATH_PREFIX + "/data/haarcascades/haarcascade_eye.xml";
+    const std::string smileCascadePath = PATH_PREFIX + "/data/haarcascades/haarcascade_smile.xml";
 
     // VideoHandle Instance Creation
     VideoHandler videoHandler("Camera", faceCascadePath, eyesCascadePath, smileCascadePath);
